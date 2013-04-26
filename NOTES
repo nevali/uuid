@@ -1,0 +1,40 @@
+Linux:
+	uuidgen [-tr]
+		-t      Generate a time-based UUID
+		-r      Generate a random UUID
+
+Microsoft:
+	uuidgen [-xisc] [-n NUM] [-o FILE]
+		-x		Generate a v1 (time-based) UUID
+		-i		Generate an IDL template
+		-s		Generate a C structure
+		-x		Output UUIDs in upper-case
+		-n NUM  Generate NUM UUIDs
+		-o FILE Write output to FILE
+
+Apple:
+	uuidgen [-hdr]
+		-hdr    Generate a CoreFoundation #define
+
+Therefore:
+	uuidgen [-hdr] [-txrsic0LDUmnwFuIj] [-n NUM] [-o FILE] [UUID ...]
+	
+	-hdr		* (Special handling for compatibility)
+	-t, -x		* Force a time-based UUID
+	-r			* Force a random UUID
+	-n NUM		* Generate NUM new UUIDs
+	-o FILE		* Write output to FILE
+	-s			* Output a (Microsoft/COM) C structure
+	-i			* Output an MSIDL template
+	-c			* Output UUIDs in uppercase
+	
+	-0			Generate a nil UUID
+	-L			Output UUIDs in lowercase (default)
+	-D			Output in standard form (default)
+	-U          Output a URN
+	-m			Output in canonical (minimal) form
+    -w          Output in Windows Registry form
+	-F			Output a CoreFoundation #define
+	-u			Output a (libuuid) C structure
+	-I			Output information about UUIDs
+	-j			Output a JSON structure
