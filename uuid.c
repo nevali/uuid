@@ -48,17 +48,24 @@ typedef enum
 	UG_RANDOM
 } generate_mode;
 
+typedef enum
+{
+	UV_NCS,
+	UV_DCE,
+	UV_MICROSOFT,
+	UV_OTHER
+} variant_type;
+
 struct uuid_info_struct
 {
-	int variant;
-	int type;
-	uint32_t time_low;
-	uint16_t time_mid;
-	uint16_t time_high_and_version;
+	variant_type variant;
+	int version;
+	uint64_t time;
 	uint16_t clock_seq;
 	uint8_t node[6];
 };
 
+static const char *variants[] = { "NCS", "DCE", "Microsoft", "other" };
 static const char *short_program_name;
 
 static void
@@ -93,19 +100,39 @@ static int
 unpack_uuid(uuid_t uu, struct uuid_info_struct *info)
 {
 	unsigned char *t;
-
-	info->type = uuid_type(uu);
-	info->variant = uuid_variant(uu);	
+	uint64_t time_low, time_mid, time_high_and_version;
+	int variant;
+	
 	t = uu;
-	info->time_low = (t[0] << 24) | (t[1] << 16) | (t[2] << 8) | t[3];
+	time_low = ((t[0] << 24) | (t[1] << 16) | (t[2] << 8) | t[3]) & 0xffffffffLL;
 	t += 4;
-	info->time_mid = (t[0] << 8) | t[1];
+	time_mid = ((t[0] << 8) | t[1]) & 0xffffLL;
 	t += 2;
-	info->time_high_and_version = (t[0] << 8) | t[1];
+	time_high_and_version = ((t[0] << 8) | t[1]) & 0xffffLL;
 	t += 2;
 	info->clock_seq = (t[0] << 8) | t[1];
 	t += 2;
 	memcpy(info->node, t, sizeof(info->node));
+	variant = (info->clock_seq & 0xe000) >> 13;
+	if(variant == 7)
+	{
+		info->variant = UV_OTHER;		
+	}
+	else if(variant == 6)
+	{
+		info->variant = UV_MICROSOFT;
+	}
+	else if(variant == 4 || variant == 5)
+	{
+		info->variant = UV_DCE;
+	}
+	else
+	{
+		info->variant = UV_NCS;
+	}
+	info->version = (time_high_and_version & 0xf000) >> 12;
+	info->time = ((time_high_and_version & 0xfffLL) << 48LL)  | (time_mid << 32LL) | time_low;
+	info->clock_seq &= 0x1fff;
 	return 0;
 }
 	
@@ -199,11 +226,9 @@ output_uuid(FILE *outfile, uuid_t uuid, output_mode mode, int upper, int sequenc
 		break;
 	case UM_INFO:
 		fprintf(outfile, "uuid: %s\n", uuidbuf);
-		fprintf(outfile, "variant: %d\n", info.variant);
-		fprintf(outfile, "type: %d\n", info.type);
-		fprintf(outfile, "time_low: %04x\n", info.time_low);
-		fprintf(outfile, "time_mid: %02x\n", info.time_mid);
-		fprintf(outfile, "time_high_and_version: %02x\n", info.time_high_and_version);
+		fprintf(outfile, "variant: %s\n", variants[info.variant]);
+		fprintf(outfile, "version: %d\n", info.version);
+		fprintf(outfile, "time: %016llx\n", info.time);
 		fprintf(outfile, "clock_seq: %02x\n", info.clock_seq);
 		fprintf(outfile, "node: %02x:%02x:%02x:%02x:%02x:%02x\n",
 				info.node[0], info.node[1], info.node[2],
@@ -212,12 +237,11 @@ output_uuid(FILE *outfile, uuid_t uuid, output_mode mode, int upper, int sequenc
 	case UM_JSON:
 		fprintf(outfile, "{\n");
 		fprintf(outfile, "  \"uuid\":\"%s\",\n", uuidbuf);
-		fprintf(outfile, "  \"variant\":%d,\n", info.variant);
-		fprintf(outfile, "  \"type\":%d,\n", info.type);
-		fprintf(outfile, "  \"time_low\":0x%04x,\n", info.time_low);
-		fprintf(outfile, "  \"time_mid\":0x%02x,\n", info.time_mid);
-		fprintf(outfile, "  \"time_high_and_version\":0x%02x,\n", info.time_high_and_version);
-		fprintf(outfile, "  \"clock_seq\":0x%02x,\n", info.clock_seq);
+		fprintf(outfile, "  \"variant\":\"%s\",\n", variants[info.variant]);
+		fprintf(outfile, "  \"version\":%d,\n", info.version);
+		fprintf(outfile, "  \"time_high\":%llu,\n", (info.time >> 32));
+		fprintf(outfile, "  \"time_low\":%llu,\n", (info.time & 0xffffffff));
+		fprintf(outfile, "  \"clock_seq\":%u,\n", info.clock_seq);
 		fprintf(outfile, "  \"node\":\"%02x:%02x:%02x:%02x:%02x:%02x\"\n",
 				info.node[0], info.node[1], info.node[2],
 				info.node[3], info.node[4], info.node[5]);
